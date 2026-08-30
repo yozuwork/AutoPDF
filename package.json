@@ -1,0 +1,15 @@
+{
+  "name": "image-to-pdf-helper",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "node dev-server.js",
+    "build:web": "node scripts/build-web.js",
+    "deploy": "npm run build:web && gh-pages -d web-dist",
+    "cloc": "node scripts/build-exe.js",
+    "build:exe": "node scripts/build-exe.js"
+  },
+  "devDependencies": {
+    "gh-pages": "^6.3.0"
+  }
+}

@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="在本機將多張圖片合併為 PDF"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' blob: data:; style-src 'self'; script-src 'self'"><title>圖片轉 PDF 小幫手</title><link rel="stylesheet" href="style.css"><link rel="stylesheet" href="pdf-cards.css"><link rel="stylesheet" href="auto-cards.css"></head>
+<body>
+<div class="window-shell">
+  <header class="titlebar"><div class="app-id"><span class="app-dot"></span>圖片轉 PDF 小幫手</div><div class="window-controls"><button id="minimize-window" type="button" title="最小化">─</button><button id="maximize-window" type="button" title="最大化">□</button><button id="close-window" class="close" type="button" title="關閉">×</button></div></header>
+  <div class="body-area">
+    <nav class="rail" aria-label="功能選單">
+      <button class="rail-button active" type="button" data-pane="manual" aria-current="page"><svg viewBox="0 0 24 24"><path d="M12 16V4m0 0L8 8m4-4 4 4M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg><span>手動轉換</span></button>
+      <button class="rail-button" type="button" data-pane="auto"><svg viewBox="0 0 24 24"><path d="M20 7h-5V2M4 17h5v5M19 12a7 7 0 0 0-12-5l-3 3m1 2a7 7 0 0 0 12 5l3-3"/></svg><span>自動轉換</span></button>
+      <button class="rail-button" type="button" data-pane="settings"><svg viewBox="0 0 24 24"><path d="M12 3v2m0 14v2M3 12h2m14 0h2M5.6 5.6 7 7m10 10 1.4 1.4m0-12.8L17 7M7 17l-1.4 1.4"/><circle cx="12" cy="12" r="4"/></svg><span>設定</span></button>
+    </nav>
+    <main class="content">
+      <section id="pane-manual" class="pane active" aria-labelledby="manual-title">
+        <p class="eyebrow">LOCAL IMAGE TOOL</p><h1 id="manual-title">圖片轉 PDF</h1><p class="subtitle">選擇多張圖片，依照你拖拉排列的順序合併成一份 PDF。</p>
+        <div id="drop-zone" class="drop-zone" tabindex="0" role="button" aria-describedby="upload-hint"><input id="file-input" type="file" accept="image/jpeg,image/png,image/webp,.zip,application/zip" multiple hidden><div class="upload-badge"><svg viewBox="0 0 24 24"><path d="M12 16V4m0 0L8 8m4-4 4 4M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg></div><h2>把圖片、資料夾或 ZIP 拖曳到這裡</h2><p id="upload-hint">或點一下選擇圖片與 ZIP</p><span class="pill">支援 ZIP、資料夾、JPG、PNG、WebP</span></div>
+        <div id="manual-workspace" hidden>
+          <div class="list-heading"><div><strong>已選擇 <span id="file-count">0</span> 張圖片</strong><span>每張卡片會產生一份 PDF</span></div><button id="add-more" class="link-button" type="button">＋ 加入更多</button></div>
+          <div id="pdf-groups" class="pdf-groups" aria-label="待產生的 PDF"></div>
+          <div class="selected-pdf-heading"><strong id="selected-group-name"></strong><span id="selected-group-count"></span></div>
+          <div id="image-list" class="image-list" aria-live="polite"></div>
+          <div class="actions-row"><button id="clear-all" class="button ghost" type="button">清空列表</button><button id="create-pdf" class="button primary" type="button">合併成 PDF</button></div>
+        </div>
+        <div class="actions-row folder-actions"><button id="open-manual-output" class="button ghost" type="button">開啟目的資料夾</button></div>
+        <p id="manual-status" class="status" role="status"></p><div class="privacy-note"><span></span>圖片只在你的裝置中處理，不會上傳到網路</div>
+      </section>
+      <section id="pane-auto" class="pane" aria-labelledby="auto-title">
+        <p class="eyebrow">AUTOMATIC CONVERSION</p><h1 id="auto-title">自動轉換</h1><p class="subtitle">選擇本次的來源與輸出資料夾，並套用設定頁的共用 PDF 規則。</p>
+        <div class="flow"><div class="flow-node"><div class="flow-icon"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/></svg></div><span>來源資料夾</span></div><div class="flow-arrow"></div><div class="flow-node"><div class="flow-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Zm0 0v6h6"/></svg></div><span>合併 PDF</span></div><div class="flow-arrow"></div><div class="flow-node"><div class="flow-icon"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/></svg></div><span>目的資料夾</span></div></div>
+        <div class="auto-folder-grid">
+          <div class="field-card"><label for="source-folder">來源資料夾（要轉換的圖片）</label><div class="path-row"><input id="source-folder" class="path-input" placeholder="尚未選擇資料夾" readonly><button id="browse-source" class="browse-button" type="button">瀏覽…</button></div></div>
+          <div class="field-card"><label for="output-folder">目的資料夾（PDF 儲存位置）</label><div class="path-row"><input id="output-folder" class="path-input" placeholder="尚未選擇資料夾" readonly><button id="browse-output" class="browse-button" type="button">瀏覽…</button></div></div>
+          <div class="auto-rule-card"><span>共用 PDF 規則</span><strong id="auto-rule-display">依圖片比例・一般邊距・依資料夾名稱</strong><button id="open-auto-settings" class="link-button" type="button">調整共用設定 →</button></div>
+        </div>
+        <div class="status-card" aria-live="polite"><div id="last-run" class="status-line muted"><span>·</span>尚未執行</div><div id="auto-status" class="status-line muted"><span>·</span>設定資料夾後即可執行</div></div>
+        <div id="auto-job-section" class="auto-job-section" hidden>
+          <div class="auto-job-heading"><div><strong>PDF 轉換工作</strong><span id="auto-job-summary"></span></div><span id="auto-job-progress"></span></div>
+          <div id="auto-job-list" class="auto-job-list" aria-live="polite"></div>
+        </div>
+        <div class="actions-row"><button id="open-auto-source" class="button ghost" type="button">開啟來源資料夾</button><button id="open-auto-output" class="button ghost" type="button">開啟目的資料夾</button><button id="run-now" class="button primary" type="button">開始自動轉換</button></div>
+      </section>
+      <section id="pane-settings" class="pane" aria-labelledby="settings-title">
+        <p class="eyebrow">PREFERENCES</p><h1 id="settings-title">設定</h1><p class="subtitle">集中管理手動轉換與自動轉換所使用的規則。</p>
+        <div class="settings-sections">
+          <section class="settings-panel"><div class="settings-panel-title"><span>01</span><div><h2>共用功能</h2><p>手動與自動轉換都會套用</p></div></div>
+            <div class="settings-grid"><label>頁面尺寸<select id="page-size"><option value="a4">A4（適合列印）</option><option value="image" selected>依圖片比例</option></select></label><label>圖片邊距<select id="margin-size"><option value="24" selected>一般</option><option value="0">無邊距</option><option value="48">寬邊距</option></select></label><label>PDF 檔名<select id="naming-mode"><option value="folder" selected>依資料夾名稱</option><option value="system">系統自動命名</option></select><small id="naming-preview">依照每張 PDF 卡片的資料夾名稱</small></label></div>
+          </section>
+          <section class="settings-panel"><div class="settings-panel-title"><span>02</span><div><h2>手動功能</h2><p>調整手動轉換完成後的行為</p></div></div>
+            <label class="toggle-row"><span><strong>完成後清空圖片列表</strong><small>PDF 下載後自動清除已加入的圖片</small></span><input id="manual-clear-after" class="switch-input" type="checkbox"><span class="switch"></span></label>
+            <label class="toggle-row"><span><strong>加入資料夾後選取最新卡片</strong><small>方便立即檢查新加入 PDF 的圖片順序</small></span><input id="manual-select-new" class="switch-input" type="checkbox" checked><span class="switch"></span></label>
+          </section>
+          <section class="settings-panel"><div class="settings-panel-title"><span>03</span><div><h2>自動功能</h2><p>設定自動轉換的長期執行偏好</p></div></div>
+            <label class="toggle-row"><span><strong>程式啟動時自動執行</strong><small>每次開啟程式時，依照上方設定自動轉換一次</small></span><input id="run-on-startup" class="switch-input" type="checkbox"><span class="switch"></span></label>
+            <label class="toggle-row"><span><strong>轉換完成後移動原始圖片</strong><small>成功後將原圖移至輸出資料夾</small></span><input id="move-originals" class="switch-input" type="checkbox"><span class="switch"></span></label>
+          </section>
+        </div>
+        <div class="settings-savebar"><span id="settings-status" role="status">設定會保存在這台裝置</span><button id="save-settings" class="button primary" type="button">儲存設定</button></div>
+      </section>
+    </main>
+  </div>
+</div>
+<div id="desktop-only-modal" class="modal-backdrop" hidden>
+  <section class="notice-modal" role="dialog" aria-modal="true" aria-labelledby="desktop-only-title" aria-describedby="desktop-only-description">
+    <div class="notice-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 9v4m0 4h.01M10.3 3.8 2.4 18a2 2 0 0 0 1.8 3h15.6a2 2 0 0 0 1.8-3L13.7 3.8a2 2 0 0 0-3.4 0Z"/></svg></div>
+    <p class="eyebrow">DESKTOP ONLY</p>
+    <h2 id="desktop-only-title">自動轉換僅限應用程式版本</h2>
+    <p id="desktop-only-description">自動轉換需要持續讀取與寫入本機資料夾，網頁版受到瀏覽器安全限制，無法使用此功能。請改用 ImageToPDF.exe 開啟。</p>
+    <button id="close-desktop-only-modal" class="button primary" type="button">我知道了</button>
+  </section>
+</div>
+<template id="image-card-template"><article class="image-card" draggable="true"><span class="grip" title="拖曳排序">⠿</span><img alt="圖片預覽"><span class="file-info"><strong class="file-name"></strong><small class="file-meta"></small></span><button class="remove-button" type="button" aria-label="移除圖片">×</button></article></template>
+<script src="app.js"></script>
+</body></html>
