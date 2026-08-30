@@ -1,0 +1,6 @@
+build/
+dist/
+web-dist/
+node_modules/
+*.spec
+__pycache__/
