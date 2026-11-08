@@ -683,6 +683,16 @@ function buildPdf(preparedImages, pageMode, margin) {
   return new Blob(chunks, { type: "application/pdf" });
 }
 
+// 桌面視窗不支援 <a download>，改由本機伺服器寫入「下載」資料夾
+async function saveDesktopPdf(pdfBlob, baseName) {
+  const token = new URLSearchParams(window.location.search).get("token") || "";
+  const params = new URLSearchParams({ token, name: baseName });
+  const response = await fetch(`/save-pdf?${params}`, { method: "POST", body: pdfBlob });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || !result.success) throw new Error(result.error || "無法儲存 PDF");
+  return result.path;
+}
+
 async function createPdf() {
   if (!images.length) return;
   createPdfButton.disabled = true;
@@ -721,6 +731,10 @@ async function createPdf() {
         if (groups.length === 1 && group.name === "圖片合併") baseName += `-${timestamp}`;
       }
 
+      if (isDesktopApp) {
+        await saveDesktopPdf(pdfBlob, baseName);
+        continue;
+      }
       const blobUrl = URL.createObjectURL(pdfBlob);
       const link = document.createElement("a");
       link.href = blobUrl;
@@ -732,7 +746,9 @@ async function createPdf() {
       if (groups.length > 1) await new Promise((resolve) => setTimeout(resolve, 250));
     }
 
-    const completedMessage = `已建立 ${groups.length} 份 PDF，共 ${images.length} 頁${groups.length > 1 ? "；若只下載一份，請允許瀏覽器下載多個檔案" : ""}`;
+    const completedMessage = isDesktopApp
+      ? `已建立 ${groups.length} 份 PDF，共 ${images.length} 頁，已存到「下載」資料夾`
+      : `已建立 ${groups.length} 份 PDF，共 ${images.length} 頁${groups.length > 1 ? "；若只下載一份，請允許瀏覽器下載多個檔案" : ""}`;
     if (manualClearAfter.checked) clearImages();
     setStatus(completedMessage);
   } catch (error) {

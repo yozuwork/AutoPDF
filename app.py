@@ -10,18 +10,23 @@ import importlib.util
 import json
 import os
 import pathlib
+import secrets
 import socketserver
 import threading
 import webbrowser
 from datetime import datetime
+from urllib.parse import parse_qs, urlparse
 
-from auto_converter import convert_folder, discover_groups
+from auto_converter import convert_folder, discover_groups, sanitize_name, unique_output_path
 
 
 APP_ROOT = pathlib.Path(__file__).resolve().parent
 APP_TITLE = "圖片轉 PDF 小幫手"
 SETTINGS_PATH = pathlib.Path(os.environ.get("LOCALAPPDATA", pathlib.Path.home())) / "ImageToPDF" / "settings.json"
 SEQUENCE_PATH = SETTINGS_PATH.with_name("sequence.json")
+DOWNLOADS_PATH = pathlib.Path.home() / "Downloads"
+# 桌面視窗存檔用的一次性金鑰，避免其他網頁呼叫本機存檔端點
+SAVE_TOKEN = secrets.token_urlsafe(24)
 
 
 class StaticRequestHandler(http.server.SimpleHTTPRequestHandler):
@@ -40,6 +45,36 @@ class StaticRequestHandler(http.server.SimpleHTTPRequestHandler):
 
     def log_message(self, format_string: str, *args: object) -> None:
         return
+
+    def do_POST(self) -> None:
+        request = urlparse(self.path)
+        query = parse_qs(request.query)
+        if request.path != "/save-pdf" or query.get("token", [""])[0] != SAVE_TOKEN:
+            self.send_error(403)
+            return
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            DOWNLOADS_PATH.mkdir(parents=True, exist_ok=True)
+            output_path = unique_output_path(DOWNLOADS_PATH, sanitize_name(query.get("name", [""])[0]))
+            remaining = length
+            with output_path.open("wb") as output:
+                while remaining > 0:
+                    chunk = self.rfile.read(min(remaining, 1024 * 1024))
+                    if not chunk:
+                        raise OSError("傳輸中斷")
+                    output.write(chunk)
+                    remaining -= len(chunk)
+            body = json.dumps({"success": True, "path": str(output_path)}, ensure_ascii=False)
+            status = 200
+        except (OSError, ValueError) as error:
+            body = json.dumps({"success": False, "error": str(error)}, ensure_ascii=False)
+            status = 500
+        encoded = body.encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(encoded)))
+        self.end_headers()
+        self.wfile.write(encoded)
 
 
 class LocalServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
@@ -212,7 +247,7 @@ def main() -> None:
     server_thread = threading.Thread(target=server.serve_forever, daemon=True)
     server_thread.start()
     try:
-        if not run_in_desktop_window(server, f"{url}?desktop=1", args.debug):
+        if not run_in_desktop_window(server, f"{url}?desktop=1&token={SAVE_TOKEN}", args.debug):
             server.shutdown()
             server.server_close()
             server = create_server(port)
