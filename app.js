@@ -1,6 +1,7 @@
 "use strict";
 
 const fileInput = document.querySelector("#file-input");
+const folderInput = document.querySelector("#folder-input");
 const dropZone = document.querySelector("#drop-zone");
 const workspace = document.querySelector("#manual-workspace");
 const imageList = document.querySelector("#image-list");
@@ -432,6 +433,126 @@ function addFiles(fileList, sourceLabel = "") {
     setStatus(`已從${sourceLabel || "拖放內容"}加入 ${validFiles.length} 張圖片`);
   }
   fileInput.value = "";
+  folderInput.value = "";
+}
+
+function compareNatural(left, right) {
+  return left.localeCompare(right, "zh-Hant", { numeric: true, sensitivity: "base" });
+}
+
+// 單一資料夾內若有子資料夾，每個第一層子資料夾各自成為一組；根目錄的圖片歸為資料夾本身。
+function groupBySubfolder(items) {
+  const groupIds = new Map();
+  return [...items]
+    .sort((left, right) => compareNatural(left.relativePath, right.relativePath))
+    .map((item) => {
+      const pathParts = item.relativePath.split("/").filter(Boolean);
+      const rootName = pathParts[0] || "資料夾";
+      const inSubfolder = pathParts.length > 2;
+      const groupKey = inSubfolder ? pathParts[1] : "";
+      if (!groupIds.has(groupKey)) groupIds.set(groupKey, crypto.randomUUID());
+      return {
+        ...item,
+        groupId: groupIds.get(groupKey),
+        groupName: inSubfolder ? pathParts[1] : rootName,
+        groupType: "folder"
+      };
+    });
+}
+
+const folderModeModal = document.querySelector("#folder-mode-modal");
+const folderModeList = document.querySelector("#folder-mode-list");
+const folderModeMergeName = document.querySelector("#folder-mode-merge-name");
+const folderModeSplit = document.querySelector("#folder-mode-split");
+const folderModeMerge = document.querySelector("#folder-mode-merge");
+const folderModeCancel = document.querySelector("#folder-mode-cancel");
+
+const folderModeMore = document.querySelector("#folder-mode-more");
+
+function askFolderMode(folderGroups, defaultName, allowAddMore = false) {
+  const isMultiple = folderGroups.length > 1;
+  document.querySelector("#folder-mode-title").textContent = isMultiple
+    ? `偵測到 ${folderGroups.length} 個資料夾`
+    : "已選擇 1 個資料夾";
+  document.querySelector("#folder-mode-description").textContent = allowAddMore
+    ? "瀏覽器一次只能選一個資料夾，可按「再加入資料夾」繼續選擇，全部選好後再決定要分成多份或合併成一份 PDF。"
+    : "要讓每個資料夾各自產生一份 PDF，還是依序合併成一份 PDF？";
+  folderModeMore.hidden = !allowAddMore;
+  folderModeMerge.hidden = !isMultiple;
+  folderModeMergeName.closest("label").hidden = !isMultiple;
+  folderModeList.replaceChildren(...folderGroups.map((group) => {
+    const row = document.createElement("li");
+    const name = document.createElement("span");
+    name.textContent = group.name;
+    name.title = group.name;
+    const count = document.createElement("span");
+    count.textContent = `${group.count} 張`;
+    row.append(name, count);
+    return row;
+  }));
+  folderModeSplit.textContent = isMultiple ? `分成 ${folderGroups.length} 份 PDF` : "完成，產生 1 份 PDF";
+  folderModeMergeName.value = defaultName;
+  folderModeModal.hidden = false;
+  folderModeSplit.focus();
+
+  return new Promise((resolve) => {
+    const finish = (choice) => {
+      folderModeModal.hidden = true;
+      folderModeSplit.removeEventListener("click", onSplit);
+      folderModeMerge.removeEventListener("click", onMerge);
+      folderModeCancel.removeEventListener("click", onCancel);
+      folderModeMore.removeEventListener("click", onMore);
+      folderModeModal.removeEventListener("click", onBackdrop);
+      document.removeEventListener("keydown", onKeydown);
+      resolve(choice);
+    };
+    const onSplit = () => finish({ mode: "split" });
+    const onMore = () => finish({ mode: "more" });
+    const onMerge = () => finish({ mode: "merge", name: folderModeMergeName.value.trim() || defaultName });
+    const onCancel = () => finish(null);
+    const onBackdrop = (event) => {
+      if (event.target === folderModeModal) finish(null);
+    };
+    const onKeydown = (event) => {
+      if (event.key === "Escape") finish(null);
+      else if (event.key === "Enter" && event.target === folderModeMergeName) onMerge();
+    };
+    folderModeSplit.addEventListener("click", onSplit);
+    folderModeMerge.addEventListener("click", onMerge);
+    folderModeCancel.addEventListener("click", onCancel);
+    folderModeMore.addEventListener("click", onMore);
+    folderModeModal.addEventListener("click", onBackdrop);
+    document.addEventListener("keydown", onKeydown);
+  });
+}
+
+// 有兩個以上資料夾（或 ZIP 內資料夾）時，詢問要分成多份 PDF 還是合併成一份；取消時回傳 null。
+// allowAddMore 時即使只有一個資料夾也會詢問，選「再加入資料夾」則回傳 "more"。
+async function resolveFolderGroups(items, parentName = "", allowAddMore = false) {
+  const folderGroups = [];
+  const groupsById = new Map();
+  for (const item of items) {
+    if (item.groupType === "files" || !isSupportedImage(item.file)) continue;
+    if (!groupsById.has(item.groupId)) {
+      const group = { id: item.groupId, name: item.groupName, count: 0 };
+      groupsById.set(item.groupId, group);
+      folderGroups.push(group);
+    }
+    groupsById.get(item.groupId).count += 1;
+  }
+  if (folderGroups.length < (allowAddMore ? 1 : 2)) return items;
+
+  setStatus("請選擇資料夾的轉換方式…");
+  const defaultName = parentName || `${folderGroups[0].name} 等 ${folderGroups.length} 個資料夾`;
+  const choice = await askFolderMode(folderGroups, defaultName, allowAddMore);
+  if (!choice) return null;
+  if (choice.mode === "more") return "more";
+  if (choice.mode === "split") return items;
+
+  const mergedGroupId = crypto.randomUUID();
+  return items.map((item) => groupsById.has(item.groupId)
+    ? { ...item, groupId: mergedGroupId, groupName: choice.name, groupType: "folder" }
+    : item);
 }
 
 function readFileEntry(entry) {
@@ -482,19 +603,22 @@ async function collectDroppedFiles(dataTransfer) {
     .filter(Boolean);
 
   if (!entries.length) {
-    return [...dataTransfer.files].map((file) => ({
+    const files = [...dataTransfer.files].map((file) => ({
       file,
       relativePath: file.name,
       groupId: manualGroupId,
       groupName: "圖片合併",
       groupType: "files"
     }));
+    return { files, parentName: "" };
   }
 
-  entries.sort((left, right) => left.name.localeCompare(right.name, "zh-Hant", {
-    numeric: true,
-    sensitivity: "base"
-  }));
+  // 只拖曳一個資料夾時，比照「選擇資料夾」依子資料夾分組。
+  if (entries.length === 1 && entries[0].isDirectory) {
+    return { files: groupBySubfolder(await collectEntryFiles(entries[0])), parentName: entries[0].name };
+  }
+
+  entries.sort((left, right) => compareNatural(left.name, right.name));
   const files = [];
   for (const entry of entries) {
     const entryFiles = await collectEntryFiles(entry);
@@ -508,22 +632,62 @@ async function collectDroppedFiles(dataTransfer) {
       groupType: isFolder ? "folder" : "files"
     })));
   }
-  return files;
+  return { files, parentName: "" };
+}
+
+async function addFolderItems(items, parentName, sourceLabel) {
+  const expanded = await expandZipFiles(items);
+  if (!expanded.length) {
+    setStatus("找不到可讀取的圖片，請確認資料夾或 ZIP 內含有 JPG、PNG、WebP", true);
+    return;
+  }
+  const files = await resolveFolderGroups(expanded, parentName);
+  if (!files) {
+    setStatus("已取消加入資料夾");
+    fileInput.value = "";
+    folderInput.value = "";
+    return;
+  }
+  addFiles(files, batchLabel(files, sourceLabel));
+}
+
+function batchLabel(files, fallback) {
+  const batchCount = new Set(files
+    .filter((item) => item.groupType !== "files" && isSupportedImage(item.file))
+    .map((item) => item.groupId)).size;
+  return batchCount ? `${batchCount} 個 PDF 批次` : fallback;
+}
+
+// 瀏覽器的資料夾選擇視窗一次只能選一個，先暫存，讓使用者連續加入後再決定分開或合併。
+let pendingFolderItems = [];
+const pendingFolderRoots = new Set();
+
+async function promptPendingFolders() {
+  const parentName = pendingFolderRoots.size === 1 ? [...pendingFolderRoots][0] : "";
+  const files = await resolveFolderGroups(pendingFolderItems, parentName, true);
+  folderInput.value = "";
+  if (files === "more") {
+    folderInput.click();
+    return;
+  }
+  pendingFolderItems = [];
+  pendingFolderRoots.clear();
+  if (!files) {
+    setStatus("已取消加入資料夾");
+    return;
+  }
+  if (!files.length) {
+    setStatus("找不到可讀取的圖片，請確認資料夾或 ZIP 內含有 JPG、PNG、WebP", true);
+    return;
+  }
+  addFiles(files, batchLabel(files, "選取的資料夾"));
 }
 
 async function handleDrop(event) {
   try {
     setStatus("正在讀取拖曳的檔案與資料夾…");
-    const droppedFiles = await collectDroppedFiles(event.dataTransfer);
-    const files = await expandZipFiles(droppedFiles);
-    const batchCount = new Set(files
-      .filter((item) => item.groupType !== "files")
-      .map((item) => item.groupId)).size;
-    if (!files.length) {
-      setStatus("找不到可讀取的圖片，請確認資料夾或 ZIP 內含有 JPG、PNG、WebP", true);
-      return;
-    }
-    addFiles(files, batchCount ? `${batchCount} 個 PDF 批次` : "拖放內容");
+    const { files, parentName } = await collectDroppedFiles(event.dataTransfer);
+    await addFolderItems(files, parentName, "拖放內容");
   } catch (error) {
     console.error(error);
     setStatus("無法讀取這個資料夾，請確認瀏覽器權限後再試一次", true);
@@ -761,6 +925,7 @@ async function createPdf() {
 
 dropZone.addEventListener("click", () => fileInput.click());
 dropZone.addEventListener("keydown", (event) => {
+  if (event.target !== dropZone) return;
   if (event.key === "Enter" || event.key === " ") {
     event.preventDefault();
     fileInput.click();
@@ -782,6 +947,43 @@ fileInput.addEventListener("change", async () => {
     fileInput.value = "";
   }
 });
+folderInput.addEventListener("change", async () => {
+  const selected = [...folderInput.files].map((file) => ({
+    file,
+    relativePath: file.webkitRelativePath || file.name
+  }));
+  if (!selected.length) {
+    if (pendingFolderItems.length) await promptPendingFolders();
+    return;
+  }
+  try {
+    setStatus("正在讀取選取的資料夾…");
+    const knownPaths = new Set(pendingFolderItems.map((item) => item.relativePath));
+    const fresh = selected.filter((item) => !knownPaths.has(item.relativePath));
+    if (fresh.length) pendingFolderRoots.add(fresh[0].relativePath.split("/")[0] || "");
+    pendingFolderItems.push(...await expandZipFiles(groupBySubfolder(fresh)));
+    await promptPendingFolders();
+  } catch (error) {
+    console.error(error);
+    pendingFolderItems = [];
+    pendingFolderRoots.clear();
+    setStatus(`無法讀取資料夾：${error instanceof Error ? error.message : "未知錯誤"}`, true);
+    folderInput.value = "";
+  }
+});
+// 取消第二次以後的資料夾選擇時，回到已選資料夾的詢問視窗。
+folderInput.addEventListener("cancel", () => {
+  if (pendingFolderItems.length) promptPendingFolders();
+});
+document.querySelector("#choose-files").addEventListener("click", (event) => {
+  event.stopPropagation();
+  fileInput.click();
+});
+document.querySelector("#choose-folder").addEventListener("click", (event) => {
+  event.stopPropagation();
+  folderInput.click();
+});
+document.querySelector("#add-folder").addEventListener("click", () => folderInput.click());
 document.querySelector("#add-more").addEventListener("click", () => fileInput.click());
 document.querySelector("#clear-all").addEventListener("click", clearImages);
 createPdfButton.addEventListener("click", createPdf);
