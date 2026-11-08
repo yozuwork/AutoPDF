@@ -13,9 +13,9 @@
     <main class="content">
       <section id="pane-manual" class="pane active" aria-labelledby="manual-title">
         <p class="eyebrow">LOCAL IMAGE TOOL</p><h1 id="manual-title">圖片轉 PDF</h1><p class="subtitle">選擇多張圖片，依照你拖拉排列的順序合併成一份 PDF。</p>
-        <div id="drop-zone" class="drop-zone" tabindex="0" role="button" aria-describedby="upload-hint"><input id="file-input" type="file" accept="image/jpeg,image/png,image/webp,.zip,application/zip" multiple hidden><div class="upload-badge"><svg viewBox="0 0 24 24"><path d="M12 16V4m0 0L8 8m4-4 4 4M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg></div><h2>把圖片、資料夾或 ZIP 拖曳到這裡</h2><p id="upload-hint">或點一下選擇圖片與 ZIP</p><span class="pill">支援 ZIP、資料夾、JPG、PNG、WebP</span></div>
+        <div id="drop-zone" class="drop-zone" tabindex="0" role="button" aria-describedby="upload-hint"><input id="file-input" type="file" accept="image/jpeg,image/png,image/webp,.zip,application/zip" multiple hidden><input id="folder-input" type="file" webkitdirectory multiple hidden><div class="upload-badge"><svg viewBox="0 0 24 24"><path d="M12 16V4m0 0L8 8m4-4 4 4M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg></div><h2>把圖片、資料夾或 ZIP 拖曳到這裡</h2><p id="upload-hint">或用下方按鈕選擇；多個資料夾請按「選擇資料夾」逐一加入</p><div class="drop-actions"><button id="choose-files" class="button ghost" type="button">選擇圖片 / ZIP</button><button id="choose-folder" class="button primary" type="button">選擇資料夾</button></div><span class="pill">支援 ZIP、資料夾、JPG、PNG、WebP</span></div>
         <div id="manual-workspace" hidden>
-          <div class="list-heading"><div><strong>已選擇 <span id="file-count">0</span> 張圖片</strong><span>每張卡片會產生一份 PDF</span></div><button id="add-more" class="link-button" type="button">＋ 加入更多</button></div>
+          <div class="list-heading"><div><strong>已選擇 <span id="file-count">0</span> 張圖片</strong><span>每張卡片會產生一份 PDF</span></div><div class="list-heading-actions"><button id="add-folder" class="link-button" type="button">＋ 加入資料夾</button><button id="add-more" class="link-button" type="button">＋ 加入更多</button></div></div>
           <div id="pdf-groups" class="pdf-groups" aria-label="待產生的 PDF"></div>
           <div class="selected-pdf-heading"><strong id="selected-group-name"></strong><span id="selected-group-count"></span></div>
           <div id="image-list" class="image-list" aria-live="polite"></div>
@@ -66,6 +66,18 @@
     <h2 id="desktop-only-title">自動轉換僅限應用程式版本</h2>
     <p id="desktop-only-description">自動轉換需要持續讀取與寫入本機資料夾，網頁版受到瀏覽器安全限制，無法使用此功能。請改用 ImageToPDF.exe 開啟。</p>
     <button id="close-desktop-only-modal" class="button primary" type="button">我知道了</button>
+  </section>
+</div>
+<div id="folder-mode-modal" class="modal-backdrop" hidden>
+  <section class="notice-modal folder-mode-modal" role="dialog" aria-modal="true" aria-labelledby="folder-mode-title" aria-describedby="folder-mode-description">
+    <div class="notice-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/></svg></div>
+    <p class="eyebrow">MULTIPLE FOLDERS</p>
+    <h2 id="folder-mode-title">偵測到多個資料夾</h2>
+    <p id="folder-mode-description">要讓每個資料夾各自產生一份 PDF，還是依序合併成一份 PDF？</p>
+    <ul id="folder-mode-list" class="folder-mode-list"></ul>
+    <label class="folder-mode-name">合併時的 PDF 名稱<input id="folder-mode-merge-name" type="text" maxlength="100"></label>
+    <div class="folder-mode-actions"><button id="folder-mode-split" class="button primary" type="button">分成多份 PDF</button><button id="folder-mode-merge" class="button ghost" type="button">合併成 1 份 PDF</button></div>
+    <div class="folder-mode-footer"><button id="folder-mode-more" class="link-button" type="button">＋ 再加入資料夾</button><button id="folder-mode-cancel" class="link-button" type="button">取消加入</button></div>
   </section>
 </div>
 <template id="image-card-template"><article class="image-card" draggable="true"><span class="grip" title="拖曳排序">⠿</span><img alt="圖片預覽"><span class="file-info"><strong class="file-name"></strong><small class="file-meta"></small></span><button class="remove-button" type="button" aria-label="移除圖片">×</button></article></template>
